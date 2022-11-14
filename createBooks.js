@@ -1,5 +1,12 @@
+import { exec } from 'child_process';
 import fs from 'fs';
 import jsonrepair from 'jsonrepair';
+
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /**
  * texts table
  * books{chapters{verses}}
@@ -15,17 +22,12 @@ import jsonrepair from 'jsonrepair';
  * }
  *
  * references table
- * {book{chapters{verses}}}
- *
- *
- *
- *
- *
+ * {book{chapters{verses[versions]}}}
  *
  */
 
-const references = {};
 const texts = {};
+const references = {};
 
 const buildReferences = ({
     chapter,
@@ -35,10 +37,6 @@ const buildReferences = ({
     book_id,
     book_name,
 } = data) => {
-    if (!references[book_id].chapters[chapter][verse]) {
-        references[book_id].chapters[chapter][verse] = { text: text };
-    }
-
     if (!references[book_id]) {
         references[book_id] = { bookName: book_name, chapters: {} };
     }
@@ -48,8 +46,10 @@ const buildReferences = ({
     }
 
     if (!references[book_id].chapters[chapter][verse]) {
-        references[book_id].chapters[chapter][verse] = verse;
+        references[book_id].chapters[chapter][verse] = [];
     }
+
+    references[book_id].chapters[chapter][verse].push(translation_id);
 };
 
 const buildKJV = () => {
@@ -58,27 +58,29 @@ const buildKJV = () => {
     const json = JSON.parse(repaired);
 
     Object.values(json).forEach(
-        ({
-            chapter,
-            verse,
-            text,
-            translation_id,
-            book_id,
-            book_name,
-        } = data) => {
-            if (!reference[book_id]) {
-                reference[book_id] = { bookName: book_name, chapters: {} };
+        ({ chapter, verse, text, translation_id, book_id, book_name }) => {
+            if (!texts[book_id]) {
+                texts[book_id] = { bookName: book_name, chapters: {} };
             }
 
-            if (!reference[book_id].chapters[chapter]) {
-                reference[book_id].chapters[chapter] = {};
+            if (!texts[book_id].chapters[chapter]) {
+                texts[book_id].chapters[chapter] = {};
             }
 
-            if (!reference[book_id].chapters[chapter][verse]) {
-                reference[book_id].chapters[chapter][verse] = { text: text };
+            if (!texts[book_id].chapters[chapter][verse]) {
+                texts[book_id].chapters[chapter][verse][translation_id] = {
+                    text: text,
+                };
             }
 
-            buildReferences(data);
+            buildReferences({
+                chapter,
+                verse,
+                text,
+                translation_id,
+                book_id,
+                book_name,
+            });
         }
     );
 };
@@ -90,19 +92,28 @@ function buildASV() {
 
     Object.values(json).forEach(
         ({ chapter, verse, text, translation_id, book_id, book_name }) => {
-            if (!reference[book_id]) {
-                reference[book_id] = { bookName: book_name, chapters: {} };
-            }
+            // if (!texts[book_id]) {
+            //     texts[book_id] = { bookName: book_name, chapters: {} };
+            // }
 
-            if (!reference[book_id].chapters[chapter]) {
-                reference[book_id].chapters[chapter] = {};
-            }
+            // if (!texts[book_id].chapters[chapter]) {
+            //     texts[book_id].chapters[chapter] = {};
+            // }
 
-            if (!reference[book_id].chapters[chapter][verse]) {
-                reference[book_id].chapters[chapter][verse] = { text: text };
-            }
+            // if (!texts[book_id].chapters[chapter][verse]) {
+            //     texts[book_id].chapters[chapter][verse][translation_id] = {
+            //         text: text,
+            //     };
+            // }
 
-            buildReferences(data);
+            buildReferences({
+                chapter,
+                verse,
+                text,
+                translation_id,
+                book_id,
+                book_name,
+            });
         }
     );
 }
@@ -111,9 +122,31 @@ const write = (json, fileName) => {
     fs.writeFileSync(fileName, JSON.stringify(json));
 };
 
-const buildAll = () => {
-    buildASV();
-    buildKJV();
+const pushToDB = (path, collection) => {
+    if (!collection?.length) {
+        console.log('No Collection Provided');
+        return;
+    }
+
+    if (!fs.existsSync(path)) {
+        console.log(`File ${path} could not be found`);
+        return;
+    }
+
+    exec(
+        `mongoimport --uri mongodb+srv://OurMargins:mt9ewYq6vE7Zvxsc@cluster0.o2xw9tk.mongodb.net/OurMargins --collection ${collection} --type json --file ${path}`
+    );
 };
 
-buildAll();
+buildKJV();
+buildASV();
+
+write(references, './references.json');
+pushToDB(__dirname + '/references.json', 'References');
+
+// const buildAll = () => {
+//     buildASV();
+//     buildKJV();
+// };
+
+// buildAll();
