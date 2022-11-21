@@ -1,13 +1,12 @@
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
 import {
     write,
     pushToDB,
     getSupportedVersions,
     getJsonFromFile,
+    getDirName,
 } from './utils.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = getDirName();
 
 const createReferences = () => {
     const references = { books: {} };

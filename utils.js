@@ -1,9 +1,15 @@
 import fs from 'fs';
 import jsonrepair from 'jsonrepair';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 
 export const write = (json, fileName) => {
     fs.writeFileSync(fileName, JSON.stringify(json));
+};
+
+export const getDirName = () => {
+    return dirname(fileURLToPath(import.meta.url));
 };
 
 export const pushToDB = (path, collection) => {
